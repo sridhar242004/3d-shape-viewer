@@ -1,0 +1,410 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Interactive 3D Product Showcase</title>
+    <style>
+    body {
+        margin: 0;
+        overflow: 0;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        height: 100vh;
+        background-color: #f0f0f0;
+        font-family: Arial, sans-serif;
+    }
+    
+    #container {
+        width: 100%;
+        height: 100%;
+    }
+    
+    #controls {
+        position: absolute;
+        top: 10px;
+        left: 10px;
+        z-index: 10;
+        background: rgba(255, 255, 255, 0.8);
+        padding: 10px;
+        border-radius: 5px;
+        box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        backdrop-filter: blur(5px);
+    }
+    
+    .control-group {
+        display: flex;
+        flex-direction: column;
+        gap: 5px;
+    }
+    
+    #controls:hover {
+        background: rgba(255, 255, 255, 0.9);
+        transform: scale(1.02);
+        transition: all 0.3s ease;
+        box-shadow: 0 0 20px rgba(0, 0, 0, 0.2);
+    }
+    
+    .control-group label {
+        font-weight: bold;
+    }
+    
+    .control-group input[type="color"],
+    .control-group input[type="file"],
+    .control-group input[type="range"] {
+        appearance: none;
+        width: 100%;
+        border: none;
+        outline: none;
+    }
+    
+    .control-group input[type="color"]::-webkit-color-swatch-wrapper {
+        padding: 0;
+    }
+    
+    .control-group input[type="color"]::-webkit-color-swatch {
+        border: none;
+    }
+    
+    .control-group input[type="range"] {
+        -webkit-appearance: none;
+        width: 100%;
+        background: linear-gradient(to right, #00ff00 0%, #00ff00 50%, #000 50%, #000 100%);
+        border-radius: 5px;
+        height: 5px;
+    }
+    
+    .control-group input[type="range"]::-webkit-slider-thumb {
+        -webkit-appearance: none;
+        width: 15px;
+        height: 15px;
+        background: #fff;
+        border-radius: 50%;
+        box-shadow: 0 0 5px rgba(0, 0, 0, 0.2);
+        cursor: pointer;
+    }
+    
+    .control-group input[type="range"]::-moz-range-thumb {
+        width: 15px;
+        height: 15px;
+        background: #fff;
+        border-radius: 50%;
+        box-shadow: 0 0 5px rgba(0, 0, 0, 0.2);
+        cursor: pointer;
+    }
+    
+    .control-group input[type="range"]::-ms-thumb {
+        width: 15px;
+        height: 15px;
+        background: #fff;
+        border-radius: 50%;
+        box-shadow: 0 0 5px rgba(0, 0, 0, 0.2);
+        cursor: pointer;
+    }
+    
+    .control-group select {
+        width: 100%;
+        padding: 5px;
+        border-radius: 5px;
+    }
+    
+    .control-group button {
+        padding: 8px 12px;
+        border: none;
+        border-radius: 5px;
+        cursor: pointer;
+        background-color: #007bff;
+        color: #fff;
+        font-weight: bold;
+    }
+    
+    .control-group button:hover {
+        background-color: #0056b3;
+    }
+    
+    .control-group button:active {
+        background-color: #004185;
+    }
+    
+    .control-group button:focus {
+        outline: none;
+        box-shadow: 0 0 5px rgba(0, 123, 255, 0.6);
+    }
+    
+    .control-group input[type="file"] {
+        display: none;
+    }
+</style>    
+</head>
+<body>
+    <div id="container"></div>
+    <div id="controls">
+        <div class="control-group">
+            <label for="colorPicker">Choose Color:</label>
+            <input type="color" id="colorPicker" value="#00ff00">
+        </div>
+        <div class="control-group">
+            <label for="textureSelect">Choose Texture:</label>
+            <select id="textureSelect">
+                <option value="">None</option>
+                <option value="textures/gray-cement-textured-wall-background.jpg">Bricks</option>
+                <option value="textures/Seamless-Oak-Texture-2.jpg">Wood</option>
+                <option value="textures/tiles.jpg">Tiles</option>
+            </select>
+        </div>
+        <div class="control-group">
+            <label for="modelSelect">Choose Model:</label>
+            <select id="modelSelect">
+                <option value="cube">Cube</option>
+                <option value="sphere">Sphere</option>
+                <option value="torus">Torus</option>
+                <option value="robot">Robot</option>
+            </select>
+        </div>
+        <div class="control-group">
+            <label for="lightIntensity">Light Intensity:</label>
+            <input type="range" id="lightIntensity" min="0" max="2" step="0.1" value="1">
+        </div>
+        <div class="control-group">
+            <label for="fileInput">Upload Model:</label>
+            <input type="file" id="fileInput" accept=".glb, .gltf">
+        </div>
+        <div class="control-group">
+            <label for="envSelect">Choose Environment:</label>
+            <select id="envSelect">
+                <option value="environments/painted_rusted_sea_01_1k.hdr">Painted Rusted Sea</option>
+                <option value="environments/field.hdr">Field</option>
+                <option value="environments/forest.hdr">Forest</option>
+            </select>
+        </div>
+        <div class="control-group">
+            <button id="addAnnotation">Add Annotation</button>
+        </div>
+        <div class="control-group">
+            <button id="moveForward">Move Forward</button>
+            <button id="moveBackward">Move Backward</button>
+            <button id="moveLeft">Move Left</button>
+            <button id="moveRight">Move Right</button>
+        </div>
+    </div>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128/examples/js/controls/OrbitControls.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128/examples/js/loaders/GLTFLoader.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128/examples/js/loaders/RGBELoader.js"></script>
+    <script>
+        let scene, camera, renderer, controls, currentModel, ambientLight, directionalLight, textureLoader, envLoader, annotations = [];
+        const loader = new THREE.GLTFLoader();
+        const annotationMaterial = new THREE.MeshStandardMaterial({ color: 0xff0000 });
+
+        function init() {
+            // Create scene
+            scene = new THREE.Scene();
+
+            // Create camera
+            camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+            camera.position.z = 5;
+
+            // Create renderer
+            renderer = new THREE.WebGLRenderer({ antialias: true });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            document.getElementById('container').appendChild(renderer.domElement);
+
+            // Add lights
+            ambientLight = new THREE.AmbientLight(0x404040); // soft white light
+            scene.add(ambientLight);
+
+            directionalLight = new THREE.DirectionalLight(0xffffff, 1);
+            directionalLight.position.set(5, 5, 5).normalize();
+            scene.add(directionalLight);
+
+            // Add controls
+            controls = new THREE.OrbitControls(camera, renderer.domElement);
+
+            // Texture loader
+            textureLoader = new THREE.TextureLoader();
+
+            // Environment loader
+            envLoader = new THREE.RGBELoader();
+            envLoader.setDataType(THREE.UnsignedByteType);
+
+            // Handle window resize
+            window.addEventListener('resize', onWindowResize, false);
+
+            // Add event listeners
+            document.getElementById('colorPicker').addEventListener('input', (event) => applyColor(event.target.value));
+            document.getElementById('textureSelect').addEventListener('change', (event) => applyTexture(event.target.value));
+            document.getElementById('modelSelect').addEventListener('change', (event) => loadModel(event.target.value));
+            document.getElementById('lightIntensity').addEventListener('input', (event) => adjustLightIntensity(event.target.value));
+            document.getElementById('fileInput').addEventListener('change', (event) => handleFileUpload(event.target.files[0]));
+            document.getElementById('envSelect').addEventListener('change', (event) => loadEnvironment(event.target.value));
+            document.getElementById('addAnnotation').addEventListener('click', addAnnotation);
+            document.getElementById('moveForward').addEventListener('click', () => moveCamera('forward'));
+            document.getElementById('moveBackward').addEventListener('click', () => moveCamera('backward'));
+            document.getElementById('moveLeft').addEventListener('click', () => moveCamera('left'));
+            document.getElementById('moveRight').addEventListener('click', () => moveCamera('right'));
+
+            // Load initial model
+            loadModel('cube');
+
+            // Start animation loop
+            animate();
+        }
+
+        function onWindowResize() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        }
+
+        function animate() {
+            requestAnimationFrame(animate);
+            controls.update();
+            renderer.render(scene, camera);
+        }
+
+        function loadModel(modelType) {
+            if (currentModel) {
+               
+// Remove the existing model from the scene
+scene.remove(currentModel);
+}
+
+let geometry;
+switch (modelType) {
+    case 'cube':
+        geometry = new THREE.BoxGeometry();
+        break;
+    case 'sphere':
+        geometry = new THREE.SphereGeometry(1, 32, 32);
+        break;
+    case 'torus':
+        geometry = new THREE.TorusGeometry(1, 0.4, 16, 100);
+        break;
+    case 'robot':
+        // Load custom robot model
+        loader.load('https://cdn.jsdelivr.net/gh/mrdoob/three.js/examples/models/gltf/RobotExpressive.glb', (gltf) => {
+            currentModel = gltf.scene;
+            scene.add(currentModel);
+        });
+        return;
+}
+
+const material = new THREE.MeshStandardMaterial({ color: 0x00ff00 });
+currentModel = new THREE.Mesh(geometry, material);
+scene.add(currentModel);
+}
+
+function applyColor(color) {
+if (currentModel) {
+    currentModel.material.color.set(color);
+}
+}
+
+function applyTexture(textureName) {
+if (!currentModel) return;
+if (textureName === "") {
+    currentModel.material.map = null;
+    currentModel.material.needsUpdate = true;
+    return;
+}
+
+// Load texture
+textureLoader.load(textureName, (texture) => {
+    currentModel.material.map = texture;
+    currentModel.material.needsUpdate = true;
+});
+}
+
+function adjustLightIntensity(intensity) {
+directionalLight.intensity = intensity;
+}
+
+function handleFileUpload(file) {
+if (file) {
+    const fileUrl = URL.createObjectURL(file);
+    loader.load(fileUrl, (gltf) => {
+        if (currentModel) {
+            scene.remove(currentModel);
+        }
+        currentModel = gltf.scene;
+        scene.add(currentModel);
+    });
+}
+}
+
+function loadEnvironment(envName) {
+if (envName === "none") {
+    scene.environment = null;
+    return;
+}
+
+// Load environment
+envLoader.load(envName, (texture) => {
+    texture.mapping = THREE.EquirectangularReflectionMapping;
+    scene.environment = texture;
+});
+}
+
+function addAnnotation() {
+if (!currentModel) return;
+const annotation = new THREE.Mesh(
+    new THREE.SphereGeometry(0.05, 16, 16),
+    annotationMaterial
+);
+annotation.position.copy(currentModel.position);
+scene.add(annotation);
+annotations.push(annotation);
+
+annotation.userData = {
+    description: "Annotation text here."
+};
+
+annotation.callback = function() {
+    alert(annotation.userData.description);
+};
+}
+
+function handleAnnotationClick(event) {
+const raycaster = new THREE.Raycaster();
+const mouse = new THREE.Vector2();
+
+mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+mouse.y = - (event.clientY / window.innerHeight) * 2 + 1;
+
+raycaster.setFromCamera(mouse, camera);
+
+const intersects = raycaster.intersectObjects(annotations);
+if (intersects.length > 0) {
+    intersects[0].object.callback();
+}
+}
+
+function moveCamera(direction) {
+switch (direction) {
+    case 'forward':
+        camera.position.z -= 0.1;
+        break;
+    case 'backward':
+        camera.position.z += 0.1;
+        break;
+    case 'left':
+        camera.position.x -= 0.1;
+        break;
+    case 'right':
+        camera.position.x += 0.1;
+        break;
+}
+}
+
+window.addEventListener('click', handleAnnotationClick, false);
+
+// Initialize the scene
+init();
+</script>
+</body>
+</html>
+
