@@ -1,410 +1,2490 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Interactive 3D Product Showcase</title>
-    <style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Aura — Spatial Design Engine</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  
+  <style>
+    /* =========================================================
+       TOKENS — Warm Cinematic Palette
+       ========================================================= */
+    :root {
+      --void: #050505;
+      --surface: #080807;
+      --elevated: #0f0f0e;
+      --glass: rgba(244, 241, 234, 0.025);
+      --glass-border: rgba(244, 241, 234, 0.07);
+      --glass-border-hover: rgba(244, 241, 234, 0.15);
+      --text: #F4F1EA;
+      --text-secondary: #8A857D;
+      --text-tertiary: #4A4744;
+      --accent: #E8B86D;
+      --accent-warm: #C8553D;
+      --accent-cool: #7A9E9F;
+      --success: #7FB069;
+      --error: #C8553D;
+      --font-ui: 'Inter', system-ui, sans-serif;
+      --font-display: 'Space Grotesk', system-ui, sans-serif;
+      --font-mono: 'JetBrains Mono', monospace;
+      --radius-sm: 4px;
+      --radius-md: 8px;
+      --radius-lg: 12px;
+      --radius-xl: 16px;
+      --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+      --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    html {
+      scroll-behavior: smooth;
+      background: var(--void);
+    }
+
     body {
-        margin: 0;
-        overflow: 0;
-        display: flex;
-        justify-content: center;
-        align-items: center;
-        height: 100vh;
-        background-color: #f0f0f0;
-        font-family: Arial, sans-serif;
+      font-family: var(--font-ui);
+      color: var(--text);
+      background: var(--void);
+      overflow-x: hidden;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
     }
-    
-    #container {
-        width: 100%;
-        height: 100%;
+
+    ::selection {
+      background: rgba(232, 184, 109, 0.25);
+      color: #fff;
     }
-    
-    #controls {
-        position: absolute;
-        top: 10px;
-        left: 10px;
-        z-index: 10;
-        background: rgba(255, 255, 255, 0.8);
-        padding: 10px;
-        border-radius: 5px;
-        box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
-        display: flex;
-        flex-direction: column;
-        gap: 10px;
-        backdrop-filter: blur(5px);
+
+    /* =========================================================
+       AMBIENT BACKGROUND
+       ========================================================= */
+    .ambient-glow {
+      position: fixed;
+      inset: 0;
+      z-index: 0;
+      pointer-events: none;
+      overflow: hidden;
     }
-    
-    .control-group {
-        display: flex;
-        flex-direction: column;
-        gap: 5px;
+
+    .ambient-glow::before {
+      content: '';
+      position: absolute;
+      top: -20%;
+      right: -10%;
+      width: 70vw;
+      height: 70vw;
+      background: radial-gradient(circle, rgba(232,184,109,0.06) 0%, transparent 60%);
+      filter: blur(80px);
+      animation: driftSlow 20s ease-in-out infinite;
     }
-    
-    #controls:hover {
-        background: rgba(255, 255, 255, 0.9);
-        transform: scale(1.02);
-        transition: all 0.3s ease;
-        box-shadow: 0 0 20px rgba(0, 0, 0, 0.2);
+
+    .ambient-glow::after {
+      content: '';
+      position: absolute;
+      bottom: -30%;
+      left: -10%;
+      width: 60vw;
+      height: 60vw;
+      background: radial-gradient(circle, rgba(200,85,61,0.04) 0%, transparent 60%);
+      filter: blur(100px);
+      animation: driftSlow 25s ease-in-out infinite reverse;
     }
-    
-    .control-group label {
-        font-weight: bold;
+
+    @keyframes driftSlow {
+      0%, 100% { transform: translate(0, 0) scale(1); }
+      50% { transform: translate(30px, -30px) scale(1.1); }
     }
-    
-    .control-group input[type="color"],
-    .control-group input[type="file"],
-    .control-group input[type="range"] {
-        appearance: none;
-        width: 100%;
-        border: none;
-        outline: none;
+
+    /* Grain */
+    .grain {
+      position: fixed;
+      inset: 0;
+      z-index: 9998;
+      pointer-events: none;
+      opacity: 0.03;
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 512 512' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
     }
-    
-    .control-group input[type="color"]::-webkit-color-swatch-wrapper {
-        padding: 0;
+
+    /* =========================================================
+       NAVIGATION — Floating Pill
+       ========================================================= */
+    .nav {
+      position: fixed;
+      top: 24px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 100;
+      display: flex;
+      align-items: center;
+      gap: 2px;
+      padding: 4px;
+      background: rgba(8, 8, 7, 0.7);
+      backdrop-filter: blur(20px) saturate(140%);
+      border: 1px solid var(--glass-border);
+      border-radius: 100px;
+      box-shadow: 0 4px 24px rgba(0,0,0,0.4);
+      transition: opacity 0.4s, transform 0.4s;
     }
-    
-    .control-group input[type="color"]::-webkit-color-swatch {
-        border: none;
+
+    .nav.hidden {
+      opacity: 0;
+      transform: translateX(-50%) translateY(-10px);
+      pointer-events: none;
     }
-    
-    .control-group input[type="range"] {
-        -webkit-appearance: none;
-        width: 100%;
-        background: linear-gradient(to right, #00ff00 0%, #00ff00 50%, #000 50%, #000 100%);
-        border-radius: 5px;
-        height: 5px;
+
+    .nav-brand {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 14px;
+      font-family: var(--font-display);
+      font-weight: 600;
+      font-size: 0.875rem;
+      letter-spacing: -0.02em;
+      color: var(--text);
     }
-    
-    .control-group input[type="range"]::-webkit-slider-thumb {
-        -webkit-appearance: none;
-        width: 15px;
-        height: 15px;
-        background: #fff;
-        border-radius: 50%;
-        box-shadow: 0 0 5px rgba(0, 0, 0, 0.2);
-        cursor: pointer;
+
+    .nav-brand span {
+      color: var(--accent);
     }
-    
-    .control-group input[type="range"]::-moz-range-thumb {
-        width: 15px;
-        height: 15px;
-        background: #fff;
-        border-radius: 50%;
-        box-shadow: 0 0 5px rgba(0, 0, 0, 0.2);
-        cursor: pointer;
+
+    .nav-divider {
+      width: 1px;
+      height: 18px;
+      background: var(--glass-border);
+      margin: 0 4px;
     }
-    
-    .control-group input[type="range"]::-ms-thumb {
-        width: 15px;
-        height: 15px;
-        background: #fff;
-        border-radius: 50%;
-        box-shadow: 0 0 5px rgba(0, 0, 0, 0.2);
-        cursor: pointer;
+
+    .nav-link {
+      padding: 6px 14px;
+      border-radius: 100px;
+      font-size: 0.8125rem;
+      font-weight: 500;
+      color: var(--text-secondary);
+      text-decoration: none;
+      transition: all 0.25s var(--ease-out-expo);
+      border: none;
+      background: none;
+      cursor: pointer;
+      font-family: inherit;
     }
-    
-    .control-group select {
-        width: 100%;
-        padding: 5px;
-        border-radius: 5px;
+
+    .nav-link:hover {
+      color: var(--text);
+      background: rgba(244,241,234,0.04);
     }
-    
-    .control-group button {
-        padding: 8px 12px;
-        border: none;
-        border-radius: 5px;
-        cursor: pointer;
-        background-color: #007bff;
-        color: #fff;
-        font-weight: bold;
+
+    .nav-link.active {
+      color: var(--void);
+      background: var(--accent);
+      font-weight: 600;
     }
-    
-    .control-group button:hover {
-        background-color: #0056b3;
+
+    .nav-cta {
+      padding: 6px 16px;
+      background: transparent;
+      color: var(--accent);
+      border: 1px solid rgba(232,184,109,0.3);
+      border-radius: 100px;
+      font-size: 0.8125rem;
+      font-weight: 600;
+      cursor: pointer;
+      font-family: inherit;
+      transition: all 0.25s;
+      margin-left: 4px;
     }
-    
-    .control-group button:active {
-        background-color: #004185;
+
+    .nav-cta:hover {
+      background: var(--accent);
+      color: var(--void);
+      border-color: var(--accent);
     }
-    
-    .control-group button:focus {
-        outline: none;
-        box-shadow: 0 0 5px rgba(0, 123, 255, 0.6);
+
+    /* =========================================================
+       HERO — Editorial Split with Integrated 3D
+       ========================================================= */
+    .hero {
+      position: relative;
+      z-index: 2;
+      min-height: 100vh;
+      display: grid;
+      grid-template-columns: 1fr 1.2fr;
+      align-items: center;
+      padding: 100px 48px 60px;
+      max-width: 1440px;
+      margin: 0 auto;
+      gap: 48px;
     }
-    
-    .control-group input[type="file"] {
+
+    .hero-editorial {
+      position: relative;
+      z-index: 2;
+    }
+
+    .hero-kicker {
+      font-family: var(--font-mono);
+      font-size: 0.6875rem;
+      text-transform: uppercase;
+      letter-spacing: 0.15em;
+      color: var(--accent);
+      margin-bottom: 24px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .hero-kicker::before {
+      content: '';
+      width: 24px;
+      height: 1px;
+      background: var(--accent);
+    }
+
+    .hero-headline {
+      font-family: var(--font-display);
+      font-size: clamp(3rem, 5.5vw, 6rem);
+      font-weight: 700;
+      line-height: 0.95;
+      letter-spacing: -0.04em;
+      margin-bottom: 28px;
+    }
+
+    .hero-headline .line {
+      display: block;
+      overflow: hidden;
+    }
+
+    .hero-headline .line span {
+      display: block;
+      transform: translateY(100%);
+      animation: revealUp 1s var(--ease-out-expo) forwards;
+    }
+
+    .hero-headline .line:nth-child(1) span { animation-delay: 0.2s; }
+    .hero-headline .line:nth-child(2) span { animation-delay: 0.3s; color: var(--accent); }
+    .hero-headline .line:nth-child(3) span { animation-delay: 0.4s; }
+
+    @keyframes revealUp {
+      to { transform: translateY(0); }
+    }
+
+    .hero-body {
+      font-size: 1.0625rem;
+      color: var(--text-secondary);
+      line-height: 1.7;
+      max-width: 420px;
+      margin-bottom: 36px;
+      opacity: 0;
+      animation: fadeIn 1s ease 0.6s forwards;
+    }
+
+    .hero-actions {
+      display: flex;
+      gap: 12px;
+      opacity: 0;
+      animation: fadeIn 1s ease 0.7s forwards;
+    }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 14px 28px;
+      border-radius: 100px;
+      font-size: 0.875rem;
+      font-weight: 600;
+      font-family: inherit;
+      cursor: pointer;
+      transition: all 0.3s var(--ease-out-expo);
+      border: none;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .btn-primary {
+      background: var(--accent);
+      color: var(--void);
+    }
+
+    .btn-primary:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 30px rgba(232,184,109,0.3);
+    }
+
+    .btn-ghost {
+      background: transparent;
+      color: var(--text);
+      border: 1px solid var(--glass-border);
+    }
+
+    .btn-ghost:hover {
+      border-color: var(--glass-border-hover);
+      background: rgba(244,241,234,0.03);
+    }
+
+    /* Hero Viewport — The Star */
+    .hero-viewport {
+      position: relative;
+      width: 100%;
+      aspect-ratio: 4 / 3;
+      background: var(--glass);
+      border: 1px solid var(--glass-border);
+      border-radius: var(--radius-xl);
+      overflow: hidden;
+      box-shadow: 
+        0 24px 80px rgba(0,0,0,0.5),
+        0 0 0 1px rgba(232,184,109,0.05) inset;
+      opacity: 0;
+      animation: fadeIn 1.2s ease 0.5s forwards;
+    }
+
+    .hero-viewport::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      border-radius: inherit;
+      padding: 1px;
+      background: linear-gradient(135deg, rgba(232,184,109,0.1), transparent 40%, transparent 60%, rgba(200,85,61,0.05));
+      -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+      -webkit-mask-composite: xor;
+      mask-composite: exclude;
+      pointer-events: none;
+      z-index: 2;
+    }
+
+    .hero-canvas {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+    }
+
+    .hero-canvas canvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+    }
+
+    .hero-viewport-overlay {
+      position: absolute;
+      inset: 0;
+      z-index: 3;
+      pointer-events: none;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      padding: 16px;
+    }
+
+    .hero-viewport-overlay > * {
+      pointer-events: auto;
+    }
+
+    .vp-badge {
+      align-self: flex-start;
+      padding: 4px 10px;
+      background: rgba(0,0,0,0.4);
+      backdrop-filter: blur(8px);
+      border: 1px solid var(--glass-border);
+      border-radius: 100px;
+      font-family: var(--font-mono);
+      font-size: 0.625rem;
+      color: var(--accent);
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+    }
+
+    .vp-controls {
+      display: flex;
+      gap: 6px;
+      align-self: flex-end;
+    }
+
+    .vp-btn {
+      width: 32px;
+      height: 32px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: rgba(0,0,0,0.4);
+      backdrop-filter: blur(8px);
+      border: 1px solid var(--glass-border);
+      border-radius: var(--radius-sm);
+      color: var(--text-secondary);
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .vp-btn:hover {
+      background: rgba(244,241,234,0.08);
+      color: var(--text);
+    }
+
+    .vp-btn.active {
+      color: var(--accent);
+      border-color: rgba(232,184,109,0.3);
+    }
+
+    /* Hero film strip */
+    .hero-filmstrip {
+      position: absolute;
+      bottom: -40px;
+      left: 48px;
+      right: 48px;
+      display: flex;
+      gap: 8px;
+      overflow-x: auto;
+      padding: 8px 0;
+      scrollbar-width: none;
+      z-index: 4;
+    }
+
+    .hero-filmstrip::-webkit-scrollbar {
+      display: none;
+    }
+
+    .film-cell {
+      flex: 0 0 auto;
+      width: 72px;
+      height: 48px;
+      background: var(--glass);
+      border: 1px solid var(--glass-border);
+      border-radius: var(--radius-sm);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      transition: all 0.3s;
+      color: var(--text-tertiary);
+    }
+
+    .film-cell:hover {
+      border-color: var(--accent);
+      color: var(--accent);
+      transform: translateY(-2px);
+    }
+
+    .film-cell.active {
+      border-color: var(--accent);
+      background: rgba(232,184,109,0.08);
+      color: var(--accent);
+    }
+
+    /* =========================================================
+       SECTIONS — Editorial Layout
+       ========================================================= */
+    .section {
+      position: relative;
+      z-index: 2;
+      padding: 120px 48px;
+      max-width: 1440px;
+      margin: 0 auto;
+    }
+
+    .section-header {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 48px;
+      align-items: end;
+      margin-bottom: 64px;
+    }
+
+    .section-kicker {
+      font-family: var(--font-mono);
+      font-size: 0.6875rem;
+      text-transform: uppercase;
+      letter-spacing: 0.15em;
+      color: var(--accent);
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .section-kicker::before {
+      content: '';
+      width: 24px;
+      height: 1px;
+      background: var(--accent);
+    }
+
+    .section-title {
+      font-family: var(--font-display);
+      font-size: clamp(2rem, 4vw, 3.5rem);
+      font-weight: 700;
+      letter-spacing: -0.03em;
+      line-height: 1.1;
+      max-width: 500px;
+    }
+
+    .section-desc {
+      font-size: 1rem;
+      color: var(--text-secondary);
+      line-height: 1.7;
+      max-width: 400px;
+      justify-self: end;
+    }
+
+    /* =========================================================
+       SHAPE LAB — Workbench Layout
+       ========================================================= */
+    .workbench {
+      display: grid;
+      grid-template-columns: 1fr 320px;
+      gap: 24px;
+      align-items: start;
+    }
+
+    .workbench-viewport {
+      position: relative;
+      aspect-ratio: 16 / 9;
+      background: var(--glass);
+      border: 1px solid var(--glass-border);
+      border-radius: var(--radius-lg);
+      overflow: hidden;
+      box-shadow: 0 16px 48px rgba(0,0,0,0.4);
+    }
+
+    .workbench-viewport::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      border-radius: inherit;
+      padding: 1px;
+      background: linear-gradient(135deg, rgba(232,184,109,0.06), transparent 50%, rgba(200,85,61,0.03));
+      -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+      -webkit-mask-composite: xor;
+      mask-composite: exclude;
+      pointer-events: none;
+      z-index: 2;
+    }
+
+    .workbench-canvas {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+    }
+
+    .workbench-canvas canvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+    }
+
+    .workbench-overlay {
+      position: absolute;
+      inset: 0;
+      z-index: 3;
+      pointer-events: none;
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      padding: 20px;
+    }
+
+    .workbench-overlay > * {
+      pointer-events: auto;
+    }
+
+    .wb-badge {
+      padding: 5px 12px;
+      background: rgba(0,0,0,0.4);
+      backdrop-filter: blur(8px);
+      border: 1px solid var(--glass-border);
+      border-radius: 100px;
+      font-family: var(--font-mono);
+      font-size: 0.625rem;
+      color: var(--accent);
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    .wb-tools {
+      display: flex;
+      gap: 6px;
+    }
+
+    .workbench-sidebar {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .wb-panel {
+      background: var(--glass);
+      backdrop-filter: blur(16px);
+      border: 1px solid var(--glass-border);
+      border-radius: var(--radius-lg);
+      padding: 20px;
+    }
+
+    .wb-panel-title {
+      font-family: var(--font-display);
+      font-size: 0.875rem;
+      font-weight: 600;
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .wb-shapes {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 8px;
+    }
+
+    .wb-shape-btn {
+      padding: 12px;
+      background: rgba(244,241,234,0.02);
+      border: 1px solid var(--glass-border);
+      border-radius: var(--radius-sm);
+      color: var(--text-secondary);
+      font-size: 0.75rem;
+      font-weight: 500;
+      font-family: inherit;
+      cursor: pointer;
+      transition: all 0.2s;
+      text-align: center;
+    }
+
+    .wb-shape-btn:hover {
+      border-color: var(--accent);
+      color: var(--accent);
+      background: rgba(232,184,109,0.04);
+    }
+
+    .wb-shape-btn.active {
+      border-color: var(--accent);
+      background: rgba(232,184,109,0.08);
+      color: var(--accent);
+      font-weight: 600;
+    }
+
+    .wb-field {
+      margin-bottom: 14px;
+    }
+
+    .wb-field:last-child {
+      margin-bottom: 0;
+    }
+
+    .wb-label {
+      font-family: var(--font-mono);
+      font-size: 0.625rem;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      color: var(--text-tertiary);
+      margin-bottom: 8px;
+      font-weight: 500;
+    }
+
+    .wb-slider {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 100%;
+      height: 2px;
+      background: rgba(244,241,234,0.08);
+      border-radius: 1px;
+      outline: none;
+      cursor: pointer;
+    }
+
+    .wb-slider::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 12px;
+      height: 12px;
+      background: var(--accent);
+      border-radius: 50%;
+      cursor: pointer;
+      transition: transform 0.2s;
+      box-shadow: 0 0 8px rgba(232,184,109,0.3);
+    }
+
+    .wb-slider::-webkit-slider-thumb:hover {
+      transform: scale(1.4);
+    }
+
+    .wb-presets {
+      display: flex;
+      gap: 6px;
+      flex-wrap: wrap;
+    }
+
+    .wb-preset {
+      padding: 5px 12px;
+      background: rgba(244,241,234,0.03);
+      border: 1px solid var(--glass-border);
+      border-radius: 100px;
+      color: var(--text-secondary);
+      font-size: 0.6875rem;
+      font-family: inherit;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .wb-preset:hover {
+      border-color: var(--glass-border-hover);
+      color: var(--text);
+    }
+
+    .wb-preset.active {
+      border-color: var(--accent);
+      color: var(--accent);
+      background: rgba(232,184,109,0.06);
+    }
+
+    .wb-color {
+      width: 100%;
+      height: 28px;
+      background: transparent;
+      border: 1px solid var(--glass-border);
+      border-radius: var(--radius-sm);
+      cursor: pointer;
+      padding: 2px;
+    }
+
+    /* =========================================================
+       MODEL GALLERY — Masonry with Inline Preview
+       ========================================================= */
+    .gallery {
+      display: grid;
+      grid-template-columns: repeat(12, 1fr);
+      gap: 20px;
+    }
+
+    .gallery-card {
+      position: relative;
+      grid-column: span 3;
+      background: var(--glass);
+      border: 1px solid var(--glass-border);
+      border-radius: var(--radius-lg);
+      overflow: hidden;
+      cursor: pointer;
+      transition: all 0.5s var(--ease-out-expo);
+    }
+
+    .gallery-card:nth-child(1) {
+      grid-column: span 5;
+      grid-row: span 2;
+    }
+
+    .gallery-card:nth-child(2) {
+      grid-column: span 4;
+    }
+
+    .gallery-card:nth-child(3) {
+      grid-column: span 3;
+    }
+
+    .gallery-card:nth-child(4) {
+      grid-column: span 4;
+    }
+
+    .gallery-card::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      border-radius: inherit;
+      padding: 1px;
+      background: linear-gradient(135deg, rgba(232,184,109,0.06), transparent 50%, rgba(200,85,61,0.03));
+      -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+      -webkit-mask-composite: xor;
+      mask-composite: exclude;
+      pointer-events: none;
+      z-index: 2;
+    }
+
+    .gallery-card:hover {
+      transform: translateY(-4px);
+      border-color: rgba(232,184,109,0.2);
+      box-shadow: 0 24px 64px rgba(0,0,0,0.5);
+    }
+
+    .gallery-thumb {
+      aspect-ratio: 4 / 3;
+      background: linear-gradient(135deg, rgba(232,184,109,0.04), rgba(200,85,61,0.02));
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .gallery-card:nth-child(1) .gallery-thumb {
+      aspect-ratio: auto;
+      height: 100%;
+    }
+
+    .gallery-thumb::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(to top, rgba(5,5,5,0.95), transparent 50%);
+      z-index: 1;
+    }
+
+    .gallery-thumb-icon {
+      width: 48px;
+      height: 48px;
+      color: var(--accent);
+      opacity: 0.3;
+      transition: all 0.5s var(--ease-out-expo);
+      z-index: 2;
+    }
+
+    .gallery-card:hover .gallery-thumb-icon {
+      opacity: 0.8;
+      transform: scale(1.1);
+    }
+
+    .gallery-info {
+      padding: 20px;
+      position: relative;
+      z-index: 2;
+    }
+
+    .gallery-name {
+      font-family: var(--font-display);
+      font-size: 1.0625rem;
+      font-weight: 600;
+      margin-bottom: 6px;
+    }
+
+    .gallery-meta {
+      display: flex;
+      gap: 6px;
+      margin-bottom: 14px;
+      flex-wrap: wrap;
+    }
+
+    .gallery-tag {
+      font-family: var(--font-mono);
+      font-size: 0.625rem;
+      padding: 2px 8px;
+      background: rgba(244,241,234,0.04);
+      border: 1px solid var(--glass-border);
+      border-radius: 100px;
+      color: var(--text-tertiary);
+    }
+
+    .gallery-action {
+      width: 100%;
+      padding: 8px;
+      background: rgba(244,241,234,0.03);
+      border: 1px solid var(--glass-border);
+      border-radius: var(--radius-sm);
+      color: var(--text-secondary);
+      font-size: 0.75rem;
+      font-weight: 600;
+      font-family: inherit;
+      cursor: pointer;
+      transition: all 0.3s;
+    }
+
+    .gallery-card:hover .gallery-action {
+      background: var(--accent);
+      color: var(--void);
+      border-color: var(--accent);
+    }
+
+    /* Inline Preview */
+    .inline-stage {
+      grid-column: 1 / -1;
+      position: relative;
+      aspect-ratio: 21 / 9;
+      background: var(--glass);
+      border: 1px solid var(--glass-border);
+      border-radius: var(--radius-lg);
+      overflow: hidden;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+      opacity: 0;
+      transform: translateY(20px);
+      transition: all 0.6s var(--ease-out-expo);
+      display: none;
+    }
+
+    .inline-stage.active {
+      display: block;
+      opacity: 1;
+      transform: translateY(0);
+    }
+
+    .inline-stage::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      border-radius: inherit;
+      padding: 1px;
+      background: linear-gradient(135deg, rgba(232,184,109,0.08), transparent 50%, rgba(200,85,61,0.04));
+      -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+      -webkit-mask-composite: xor;
+      mask-composite: exclude;
+      pointer-events: none;
+      z-index: 2;
+    }
+
+    .inline-canvas {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+    }
+
+    .inline-canvas canvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+    }
+
+    .inline-overlay {
+      position: absolute;
+      inset: 0;
+      z-index: 3;
+      pointer-events: none;
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      padding: 24px;
+    }
+
+    .inline-overlay > * {
+      pointer-events: auto;
+    }
+
+    .inline-title {
+      font-family: var(--font-display);
+      font-size: 1.25rem;
+      font-weight: 600;
+    }
+
+    .inline-close {
+      width: 36px;
+      height: 36px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: rgba(0,0,0,0.5);
+      backdrop-filter: blur(10px);
+      border: 1px solid var(--glass-border);
+      border-radius: var(--radius-sm);
+      color: var(--text-secondary);
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .inline-close:hover {
+      background: rgba(244,241,234,0.1);
+      color: var(--text);
+    }
+
+    /* =========================================================
+       STUDIO CTA
+       ========================================================= */
+    .cta-section {
+      position: relative;
+      z-index: 2;
+      padding: 160px 48px;
+      text-align: center;
+      background: radial-gradient(ellipse at center, rgba(232,184,109,0.03) 0%, transparent 70%);
+    }
+
+    .cta-section h2 {
+      font-family: var(--font-display);
+      font-size: clamp(2.5rem, 5vw, 4rem);
+      font-weight: 700;
+      letter-spacing: -0.03em;
+      margin-bottom: 16px;
+    }
+
+    .cta-section p {
+      color: var(--text-secondary);
+      font-size: 1.0625rem;
+      max-width: 500px;
+      margin: 0 auto 32px;
+      line-height: 1.7;
+    }
+
+    .cta-btn {
+      padding: 16px 40px;
+      background: var(--accent);
+      color: var(--void);
+      border: none;
+      border-radius: 100px;
+      font-size: 0.9375rem;
+      font-weight: 600;
+      font-family: inherit;
+      cursor: pointer;
+      transition: all 0.3s;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .cta-btn:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 40px rgba(232,184,109,0.3);
+    }
+
+    /* =========================================================
+       STUDIO OVERLAY — Cinematic Mode
+       ========================================================= */
+    .studio-overlay {
+      position: fixed;
+      inset: 0;
+      z-index: 1000;
+      opacity: 0;
+      visibility: hidden;
+      transition: all 0.6s var(--ease-out-expo);
+      background: var(--void);
+    }
+
+    .studio-overlay.active {
+      opacity: 1;
+      visibility: visible;
+    }
+
+    .studio-canvas-wrap {
+      position: absolute;
+      inset: 0;
+    }
+
+    .studio-canvas-wrap canvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+    }
+
+    .studio-vignette {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      background: radial-gradient(ellipse at center, transparent 40%, var(--void) 100%);
+      z-index: 1;
+    }
+
+    .studio-hud {
+      position: absolute;
+      inset: 20px;
+      z-index: 2;
+      pointer-events: none;
+      display: grid;
+      grid-template-columns: 260px 1fr 300px;
+      grid-template-rows: auto 1fr auto;
+      gap: 16px;
+    }
+
+    .studio-hud > * {
+      pointer-events: auto;
+    }
+
+    .shud-panel {
+      background: rgba(8, 8, 7, 0.75);
+      backdrop-filter: blur(24px) saturate(140%);
+      border: 1px solid var(--glass-border);
+      border-radius: var(--radius-lg);
+      overflow: hidden;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+    }
+
+    .shud-top {
+      grid-column: 1 / -1;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 12px 16px;
+    }
+
+    .shud-back {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 12px;
+      background: rgba(244,241,234,0.04);
+      border: 1px solid var(--glass-border);
+      border-radius: var(--radius-sm);
+      color: var(--text-secondary);
+      font-size: 0.8125rem;
+      font-weight: 500;
+      font-family: inherit;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .shud-back:hover {
+      background: rgba(244,241,234,0.08);
+      color: var(--text);
+    }
+
+    .shud-title {
+      font-family: var(--font-display);
+      font-size: 0.9375rem;
+      font-weight: 600;
+    }
+
+    .shud-tools {
+      display: flex;
+      gap: 4px;
+    }
+
+    .shud-tool {
+      width: 34px;
+      height: 34px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: transparent;
+      border: none;
+      border-radius: var(--radius-sm);
+      color: var(--text-tertiary);
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .shud-tool:hover {
+      background: rgba(244,241,234,0.06);
+      color: var(--text);
+    }
+
+    .shud-left {
+      grid-row: 2;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .shud-right {
+      grid-row: 2;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .shud-header {
+      padding: 14px 16px;
+      border-bottom: 1px solid var(--glass-border);
+      font-family: var(--font-display);
+      font-size: 0.8125rem;
+      font-weight: 600;
+    }
+
+    .shud-content {
+      flex: 1;
+      overflow-y: auto;
+      padding: 14px;
+      scrollbar-width: thin;
+      scrollbar-color: rgba(244,241,234,0.06) transparent;
+    }
+
+    .shud-content::-webkit-scrollbar {
+      width: 4px;
+    }
+
+    .shud-content::-webkit-scrollbar-thumb {
+      background: rgba(244,241,234,0.1);
+      border-radius: 4px;
+    }
+
+    .shud-field {
+      margin-bottom: 14px;
+    }
+
+    .shud-field-label {
+      font-family: var(--font-mono);
+      font-size: 0.625rem;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      color: var(--text-tertiary);
+      margin-bottom: 6px;
+      font-weight: 500;
+    }
+
+    .shud-slider {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 100%;
+      height: 2px;
+      background: rgba(244,241,234,0.08);
+      border-radius: 1px;
+      outline: none;
+      cursor: pointer;
+    }
+
+    .shud-slider::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 12px;
+      height: 12px;
+      background: var(--accent);
+      border-radius: 50%;
+      cursor: pointer;
+      transition: transform 0.2s;
+      box-shadow: 0 0 8px rgba(232,184,109,0.3);
+    }
+
+    .shud-slider::-webkit-slider-thumb:hover {
+      transform: scale(1.4);
+    }
+
+    .shud-select {
+      width: 100%;
+      padding: 8px 10px;
+      background: rgba(244,241,234,0.04);
+      border: 1px solid var(--glass-border);
+      border-radius: var(--radius-sm);
+      color: var(--text);
+      font-size: 0.8125rem;
+      font-family: inherit;
+      outline: none;
+      cursor: pointer;
+    }
+
+    .shud-select:focus {
+      border-color: rgba(232,184,109,0.4);
+    }
+
+    .shud-color {
+      width: 100%;
+      height: 28px;
+      background: transparent;
+      border: 1px solid var(--glass-border);
+      border-radius: var(--radius-sm);
+      cursor: pointer;
+      padding: 2px;
+    }
+
+    .shud-toggle-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .shud-toggle {
+      padding: 4px 12px;
+      background: rgba(244,241,234,0.04);
+      border: 1px solid var(--glass-border);
+      border-radius: var(--radius-sm);
+      color: var(--text-secondary);
+      font-size: 0.8125rem;
+      font-family: inherit;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .shud-toggle.active {
+      background: rgba(232,184,109,0.15);
+      color: var(--accent);
+      border-color: rgba(232,184,109,0.3);
+    }
+
+    .shud-bottom {
+      grid-column: 2;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      padding: 8px;
+    }
+
+    .shud-viewport-controls {
+      display: flex;
+      gap: 6px;
+      padding: 6px;
+      background: rgba(0,0,0,0.5);
+      backdrop-filter: blur(20px);
+      border: 1px solid var(--glass-border);
+      border-radius: var(--radius-lg);
+    }
+
+    .sv-btn {
+      width: 36px;
+      height: 36px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: transparent;
+      border: none;
+      border-radius: var(--radius-sm);
+      color: var(--text-tertiary);
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .sv-btn:hover {
+      background: rgba(244,241,234,0.06);
+      color: var(--text);
+    }
+
+    .sv-btn.active {
+      background: rgba(232,184,109,0.15);
+      color: var(--accent);
+    }
+
+    .scene-badge {
+      position: absolute;
+      top: 80px;
+      left: 50%;
+      transform: translateX(-50%);
+      padding: 5px 14px;
+      background: rgba(232,184,109,0.08);
+      border: 1px solid rgba(232,184,109,0.2);
+      border-radius: 100px;
+      font-size: 0.6875rem;
+      font-weight: 600;
+      color: var(--accent);
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      backdrop-filter: blur(10px);
+      z-index: 3;
+      pointer-events: none;
+    }
+
+    .fps-readout {
+      position: absolute;
+      bottom: 84px;
+      right: 336px;
+      padding: 4px 10px;
+      background: rgba(0,0,0,0.4);
+      border: 1px solid var(--glass-border);
+      border-radius: 100px;
+      font-family: var(--font-mono);
+      font-size: 0.6875rem;
+      color: var(--text-tertiary);
+      z-index: 3;
+      pointer-events: none;
+    }
+
+    /* =========================================================
+       TOASTS
+       ========================================================= */
+    .toast-stack {
+      position: fixed;
+      bottom: 24px;
+      right: 24px;
+      z-index: 10000;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      pointer-events: none;
+    }
+
+    .toast {
+      background: rgba(15, 15, 14, 0.95);
+      backdrop-filter: blur(24px);
+      border: 1px solid var(--glass-border);
+      border-radius: var(--radius-lg);
+      padding: 12px 16px;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      min-width: 280px;
+      transform: translateX(calc(100% + 40px));
+      transition: transform 0.5s var(--ease-spring);
+      pointer-events: auto;
+    }
+
+    .toast.show {
+      transform: translateX(0);
+    }
+
+    .toast-icon {
+      width: 20px;
+      height: 20px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.625rem;
+      font-weight: 700;
+      color: #fff;
+      flex-shrink: 0;
+    }
+
+    .toast-success .toast-icon { background: var(--success); }
+    .toast-error .toast-icon { background: var(--error); }
+    .toast-info .toast-icon { background: var(--accent); }
+
+    .toast-msg {
+      font-size: 0.8125rem;
+      font-weight: 500;
+    }
+
+    /* =========================================================
+       ANIMATIONS
+       ========================================================= */
+    @keyframes fadeIn {
+      from { opacity: 0; }
+      to { opacity: 1; }
+    }
+
+    @keyframes revealUp {
+      from { transform: translateY(100%); }
+      to { transform: translateY(0); }
+    }
+
+    /* =========================================================
+       RESPONSIVE
+       ========================================================= */
+    @media (max-width: 1100px) {
+      .hero {
+        grid-template-columns: 1fr;
+        padding: 100px 24px 60px;
+      }
+      .hero-viewport {
+        aspect-ratio: 16 / 10;
+      }
+      .hero-filmstrip {
+        left: 24px;
+        right: 24px;
+      }
+      .section {
+        padding: 80px 24px;
+      }
+      .section-header {
+        grid-template-columns: 1fr;
+        gap: 16px;
+      }
+      .section-desc {
+        justify-self: start;
+      }
+      .workbench {
+        grid-template-columns: 1fr;
+      }
+      .gallery {
+        grid-template-columns: repeat(2, 1fr);
+      }
+      .gallery-card:nth-child(1),
+      .gallery-card:nth-child(2),
+      .gallery-card:nth-child(3),
+      .gallery-card:nth-child(4) {
+        grid-column: span 1;
+        grid-row: span 1;
+      }
+      .gallery-card:nth-child(1) .gallery-thumb {
+        aspect-ratio: 4 / 3;
+        height: auto;
+      }
+      .studio-hud {
+        grid-template-columns: 1fr;
+        grid-template-rows: auto 1fr 1fr auto;
+      }
+      .shud-left, .shud-right {
         display: none;
+      }
+      .shud-bottom {
+        grid-column: 1;
+      }
     }
-</style>    
+
+    @media (max-width: 600px) {
+      .hero-headline { font-size: 2.5rem; }
+      .hero-actions { flex-direction: column; }
+      .btn { width: 100%; justify-content: center; }
+      .nav { top: 12px; padding: 3px; }
+      .nav-brand span { display: none; }
+      .nav-link { padding: 5px 10px; font-size: 0.75rem; }
+      .gallery { grid-template-columns: 1fr; }
+      .cta-section { padding: 100px 24px; }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      * { animation: none !important; transition: none !important; }
+    }
+  </style>
 </head>
 <body>
-    <div id="container"></div>
-    <div id="controls">
-        <div class="control-group">
-            <label for="colorPicker">Choose Color:</label>
-            <input type="color" id="colorPicker" value="#00ff00">
-        </div>
-        <div class="control-group">
-            <label for="textureSelect">Choose Texture:</label>
-            <select id="textureSelect">
-                <option value="">None</option>
-                <option value="/gray-cement-textured-wall-background.jpg">Bricks</option>
-                <option value="/Seamless-Oak-Texture-2.jpg">Wood</option>
-                <option value="/tiles.jpg">Tiles</option>
-            </select>
-        </div>
-        <div class="control-group">
-            <label for="modelSelect">Choose Model:</label>
-            <select id="modelSelect">
-                <option value="cube">Cube</option>
-                <option value="sphere">Sphere</option>
-                <option value="torus">Torus</option>
-                <option value="robot">Robot</option>
-            </select>
-        </div>
-        <div class="control-group">
-            <label for="lightIntensity">Light Intensity:</label>
-            <input type="range" id="lightIntensity" min="0" max="2" step="0.1" value="1">
-        </div>
-        <div class="control-group">
-            <label for="fileInput">Upload Model:</label>
-            <input type="file" id="fileInput" accept=".glb, .gltf">
-        </div>
-        <div class="control-group">
-            <label for="envSelect">Choose Environment:</label>
-            <select id="envSelect">
-                <option value="environments/painted_rusted_sea_01_1k.hdr">Painted Rusted Sea</option>
-                <option value="environments/field.hdr">Field</option>
-                <option value="environments/forest.hdr">Forest</option>
-            </select>
-        </div>
-        <div class="control-group">
-            <button id="addAnnotation">Add Annotation</button>
-        </div>
-        <div class="control-group">
-            <button id="moveForward">Move Forward</button>
-            <button id="moveBackward">Move Backward</button>
-            <button id="moveLeft">Move Left</button>
-            <button id="moveRight">Move Right</button>
-        </div>
+
+  <!-- Ambient Background -->
+  <div class="ambient-glow"></div>
+  <div class="grain"></div>
+
+  <!-- Navigation -->
+  <nav class="nav" id="nav-bar">
+    <div class="nav-brand">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M12 2L2 7l10 5 10-5-10-5z"/>
+        <path d="M2 17l10 5 10-5"/>
+        <path d="M2 12l10 5 10-5"/>
+      </svg>
+      <span>Aura</span>
     </div>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/three@0.128/examples/js/controls/OrbitControls.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/three@0.128/examples/js/loaders/GLTFLoader.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/three@0.128/examples/js/loaders/RGBELoader.js"></script>
-    <script>
-        let scene, camera, renderer, controls, currentModel, ambientLight, directionalLight, textureLoader, envLoader, annotations = [];
-        const loader = new THREE.GLTFLoader();
-        const annotationMaterial = new THREE.MeshStandardMaterial({ color: 0xff0000 });
+    <div class="nav-divider"></div>
+    <button class="nav-link active" data-section="hero">Index</button>
+    <button class="nav-link" data-section="shapes">Lab</button>
+    <button class="nav-link" data-section="models">Library</button>
+    <button class="nav-link" data-section="studio">Studio</button>
+    <div class="nav-divider"></div>
+    <button class="nav-cta" id="nav-launch">Open Studio</button>
+  </nav>
 
-        function init() {
-            // Create scene
-            scene = new THREE.Scene();
+  <!-- ==================== HERO — Editorial Split ==================== -->
+  <section class="hero" id="hero">
+    <div class="hero-editorial">
+      <div class="hero-kicker">Spatial Design Engine</div>
+      <h1 class="hero-headline">
+        <div class="line"><span>Shape</span></div>
+        <div class="line"><span>Light</span></div>
+        <div class="line"><span>Material</span></div>
+      </h1>
+      <p class="hero-body">
+        A professional-grade 3D environment that lives in your browser. Cinematic lighting, real-time PBR materials, and zero installation. Built for designers who refuse to compromise.
+      </p>
+      <div class="hero-actions">
+        <button class="btn btn-primary" onclick="document.getElementById('shapes').scrollIntoView({behavior:'smooth'})">
+          Enter Lab
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M5 12h14M12 5l7 7-7 7"/>
+          </svg>
+        </button>
+        <button class="btn btn-ghost" onclick="document.getElementById('models').scrollIntoView({behavior:'smooth'})">
+          Browse Library
+        </button>
+      </div>
+    </div>
 
-            // Create camera
-            camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
-            camera.position.z = 5;
+    <div class="hero-viewport" id="hero-viewport">
+      <div class="hero-canvas" id="hero-canvas"></div>
+      <div class="hero-viewport-overlay">
+        <div class="vp-badge">Live Render</div>
+        <div class="vp-controls">
+          <button class="vp-btn" id="hero-grid" title="Grid">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 3v18"/></svg>
+          </button>
+          <button class="vp-btn" id="hero-wire" title="Wireframe">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l9 4.9V17L12 22l-9-4.9V7z"/></svg>
+          </button>
+          <button class="vp-btn" id="hero-rotate" title="Auto Rotate">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.2"/></svg>
+          </button>
+        </div>
+      </div>
+    </div>
 
-            // Create renderer
-            renderer = new THREE.WebGLRenderer({ antialias: true });
-            renderer.setSize(window.innerWidth, window.innerHeight);
-            document.getElementById('container').appendChild(renderer.domElement);
+    <div class="hero-filmstrip">
+      <button class="film-cell active" data-shape="torus" title="Torus Knot">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><circle cx="12" cy="12" r="8"/></svg>
+      </button>
+      <button class="film-cell" data-shape="sphere" title="Sphere">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/></svg>
+      </button>
+      <button class="film-cell" data-shape="cube" title="Cube">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/></svg>
+      </button>
+      <button class="film-cell" data-shape="icosahedron" title="Icosahedron">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l10 6v8l-10 6-10-6V8z"/></svg>
+      </button>
+      <button class="film-cell" data-shape="cone" title="Cone">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2L2 22h20L12 2z"/></svg>
+      </button>
+      <button class="film-cell" data-shape="cylinder" title="Cylinder">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><ellipse cx="12" cy="5" rx="8" ry="3"/><path d="M4 5v14c0 1.66 3.58 3 8 3s8-1.34 8-3V5"/></svg>
+      </button>
+    </div>
+  </section>
 
-            // Add lights
-            ambientLight = new THREE.AmbientLight(0x404040); // soft white light
-            scene.add(ambientLight);
+  <!-- ==================== SHAPE LAB — Workbench ==================== -->
+  <section class="section" id="shapes">
+    <div class="section-header">
+      <div>
+        <div class="section-kicker">01 — Procedural</div>
+        <h2 class="section-title">The Shape Lab</h2>
+      </div>
+      <p class="section-desc">
+        Instant geometry with zero loading time. Select a primitive, dial in the material, and watch the render update in real time.
+      </p>
+    </div>
 
-            directionalLight = new THREE.DirectionalLight(0xffffff, 1);
-            directionalLight.position.set(5, 5, 5).normalize();
-            scene.add(directionalLight);
+    <div class="workbench">
+      <div class="workbench-viewport" id="lab-viewport">
+        <div class="workbench-canvas" id="lab-canvas"></div>
+        <div class="workbench-overlay">
+          <div class="wb-badge">Real-time Preview</div>
+          <div class="wb-tools">
+            <button class="vp-btn" id="lab-grid" title="Grid">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 3v18"/></svg>
+            </button>
+            <button class="vp-btn" id="lab-wire" title="Wireframe">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l9 4.9V17L12 22l-9-4.9V7z"/></svg>
+            </button>
+            <button class="vp-btn" id="lab-rotate" title="Auto Rotate">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.2"/></svg>
+            </button>
+          </div>
+        </div>
+      </div>
 
-            // Add controls
-            controls = new THREE.OrbitControls(camera, renderer.domElement);
+      <div class="workbench-sidebar">
+        <div class="wb-panel">
+          <div class="wb-panel-title">Primitives</div>
+          <div class="wb-shapes">
+            <button class="wb-shape-btn active" data-shape="torus">Torus Knot</button>
+            <button class="wb-shape-btn" data-shape="sphere">Sphere</button>
+            <button class="wb-shape-btn" data-shape="cube">Cube</button>
+            <button class="wb-shape-btn" data-shape="icosahedron">Icosahedron</button>
+            <button class="wb-shape-btn" data-shape="cone">Cone</button>
+            <button class="wb-shape-btn" data-shape="cylinder">Cylinder</button>
+          </div>
+        </div>
 
-            // Texture loader
-            textureLoader = new THREE.TextureLoader();
+        <div class="wb-panel">
+          <div class="wb-panel-title">Material</div>
+          <div class="wb-field">
+            <div class="wb-label">Metalness</div>
+            <input type="range" class="wb-slider" id="lab-metalness" min="0" max="1" step="0.01" value="0.1">
+          </div>
+          <div class="wb-field">
+            <div class="wb-label">Roughness</div>
+            <input type="range" class="wb-slider" id="lab-roughness" min="0" max="1" step="0.01" value="0.25">
+          </div>
+          <div class="wb-field">
+            <div class="wb-label">Base Color</div>
+            <input type="color" class="wb-color" id="lab-color" value="#6366f1">
+          </div>
+        </div>
 
-            // Environment loader
-            envLoader = new THREE.RGBELoader();
-            envLoader.setDataType(THREE.UnsignedByteType);
+        <div class="wb-panel">
+          <div class="wb-panel-title">Environment</div>
+          <div class="wb-presets">
+            <button class="wb-preset active" data-env="room">Studio</button>
+            <button class="wb-preset" data-env="city">City</button>
+            <button class="wb-preset" data-env="forest">Forest</button>
+            <button class="wb-preset" data-env="none">None</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
 
-            // Handle window resize
-            window.addEventListener('resize', onWindowResize, false);
+  <!-- ==================== MODEL GALLERY — Masonry ==================== -->
+  <section class="section" id="models">
+    <div class="section-header">
+      <div>
+        <div class="section-kicker">02 — Assets</div>
+        <h2 class="section-title">Model Library</h2>
+      </div>
+      <p class="section-desc">
+        Curated high-quality assets from the glTF ecosystem. Preview inline with full PBR support before importing into your scene.
+      </p>
+    </div>
 
-            // Add event listeners
-            document.getElementById('colorPicker').addEventListener('input', (event) => applyColor(event.target.value));
-            document.getElementById('textureSelect').addEventListener('change', (event) => applyTexture(event.target.value));
-            document.getElementById('modelSelect').addEventListener('change', (event) => loadModel(event.target.value));
-            document.getElementById('lightIntensity').addEventListener('input', (event) => adjustLightIntensity(event.target.value));
-            document.getElementById('fileInput').addEventListener('change', (event) => handleFileUpload(event.target.files[0]));
-            document.getElementById('envSelect').addEventListener('change', (event) => loadEnvironment(event.target.value));
-            document.getElementById('addAnnotation').addEventListener('click', addAnnotation);
-            document.getElementById('moveForward').addEventListener('click', () => moveCamera('forward'));
-            document.getElementById('moveBackward').addEventListener('click', () => moveCamera('backward'));
-            document.getElementById('moveLeft').addEventListener('click', () => moveCamera('left'));
-            document.getElementById('moveRight').addEventListener('click', () => moveCamera('right'));
+    <div class="gallery">
+      <div class="gallery-card" data-model="robot">
+        <div class="gallery-thumb">
+          <svg class="gallery-thumb-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+            <rect x="4" y="4" width="16" height="12" rx="2"/><circle cx="9" cy="9" r="1" fill="currentColor"/><circle cx="15" cy="9" r="1" fill="currentColor"/><path d="M8 14h8"/><path d="M12 16v4"/><path d="M9 20h6"/>
+          </svg>
+        </div>
+        <div class="gallery-info">
+          <div class="gallery-name">Robot Expressive</div>
+          <div class="gallery-meta">
+            <span class="gallery-tag">GLB</span>
+            <span class="gallery-tag">Animated</span>
+          </div>
+          <button class="gallery-action">Preview Inline</button>
+        </div>
+      </div>
 
-            // Load initial model
-            loadModel('cube');
+      <div class="gallery-card" data-model="duck">
+        <div class="gallery-thumb">
+          <svg class="gallery-thumb-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+            <path d="M12 7c-2 0-4 1.5-4 4 0 2 1 3 2 4h6c1-1 2-2 2-4 0-2.5-2-4-4-4z"/><circle cx="10" cy="9" r="0.5" fill="currentColor"/><path d="M8 10c-2 0-3 1-3 2s1 2 3 2"/>
+          </svg>
+        </div>
+        <div class="gallery-info">
+          <div class="gallery-name">Classic Duck</div>
+          <div class="gallery-meta">
+            <span class="gallery-tag">GLB</span>
+            <span class="gallery-tag">glTF Sample</span>
+          </div>
+          <button class="gallery-action">Preview Inline</button>
+        </div>
+      </div>
 
-            // Start animation loop
-            animate();
-        }
+      <div class="gallery-card" data-model="fox">
+        <div class="gallery-thumb">
+          <svg class="gallery-thumb-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+            <path d="M4 8l4-4 2 2 2-2 4 4"/><path d="M12 10v8"/><path d="M8 14l4 4 4-4"/>
+          </svg>
+        </div>
+        <div class="gallery-info">
+          <div class="gallery-name">Low-Poly Fox</div>
+          <div class="gallery-meta">
+            <span class="gallery-tag">GLB</span>
+            <span class="gallery-tag">Animated</span>
+          </div>
+          <button class="gallery-action">Preview Inline</button>
+        </div>
+      </div>
 
-        function onWindowResize() {
-            camera.aspect = window.innerWidth / window.innerHeight;
-            camera.updateProjectionMatrix();
-            renderer.setSize(window.innerWidth, window.innerHeight);
-        }
+      <div class="gallery-card" data-model="helmet">
+        <div class="gallery-thumb">
+          <svg class="gallery-thumb-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+            <circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/>
+          </svg>
+        </div>
+        <div class="gallery-info">
+          <div class="gallery-name">Flight Helmet</div>
+          <div class="gallery-meta">
+            <span class="gallery-tag">GLB</span>
+            <span class="gallery-tag">PBR</span>
+          </div>
+          <button class="gallery-action">Preview Inline</button>
+        </div>
+      </div>
 
-        function animate() {
-            requestAnimationFrame(animate);
-            controls.update();
-            renderer.render(scene, camera);
-        }
+      <!-- Inline Preview Stage -->
+      <div class="inline-stage" id="inline-stage">
+        <div class="inline-canvas" id="inline-canvas"></div>
+        <div class="inline-overlay">
+          <div class="inline-title" id="inline-title">Model Preview</div>
+          <button class="inline-close" id="inline-close">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+            </svg>
+          </button>
+        </div>
+      </div>
+    </div>
+  </section>
 
-        function loadModel(modelType) {
-            if (currentModel) {
-               
-// Remove the existing model from the scene
-scene.remove(currentModel);
-}
+  <!-- ==================== STUDIO CTA ==================== -->
+  <section class="cta-section" id="studio">
+    <div class="section-kicker" style="justify-content:center;margin-bottom:20px;">03 — Professional</div>
+    <h2>Ready for Production?</h2>
+    <p>Open the full Studio environment for advanced material editing, annotations, timeline control, and 4K export. All in your browser.</p>
+    <button class="cta-btn" id="open-studio">Enter Studio</button>
+  </section>
 
-let geometry;
-switch (modelType) {
-    case 'cube':
-        geometry = new THREE.BoxGeometry();
-        break;
-    case 'sphere':
-        geometry = new THREE.SphereGeometry(1, 32, 32);
-        break;
-    case 'torus':
-        geometry = new THREE.TorusGeometry(1, 0.4, 16, 100);
-        break;
-    case 'robot':
-        // Load custom robot model
-        loader.load('https://cdn.jsdelivr.net/gh/mrdoob/three.js/examples/models/gltf/RobotExpressive.glb', (gltf) => {
-            currentModel = gltf.scene;
-            scene.add(currentModel);
+  <!-- ==================== STUDIO OVERLAY ==================== -->
+  <div class="studio-overlay" id="studio-overlay">
+    <div class="studio-canvas-wrap" id="studio-canvas"></div>
+    <div class="studio-vignette"></div>
+    <div class="scene-badge" id="studio-badge">Studio Environment</div>
+    <div class="fps-readout" id="studio-fps">60 FPS</div>
+
+    <div class="studio-hud">
+      <div class="shud-panel shud-top">
+        <div style="display:flex;align-items:center;gap:12px;">
+          <button class="shud-back" id="studio-back">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M19 12H5M12 19l-7-7 7-7"/>
+            </svg>
+            Exit Studio
+          </button>
+          <div class="shud-title" id="studio-model-title">Torus Knot</div>
+        </div>
+        <div class="shud-tools">
+          <button class="shud-tool" id="studio-screenshot" title="Screenshot">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/>
+            </svg>
+          </button>
+          <button class="shud-tool" id="studio-fullscreen" title="Fullscreen">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/>
+            </svg>
+          </button>
+        </div>
+      </div>
+
+      <div class="shud-panel shud-left">
+        <div class="shud-header">Scene</div>
+        <div class="shud-content">
+          <div class="shud-field">
+            <div class="shud-field-label">Model</div>
+            <div style="font-size:0.8125rem;color:var(--text-secondary);">Torus Knot</div>
+          </div>
+          <div class="shud-field">
+            <div class="shud-field-label">Vertices</div>
+            <div style="font-family:var(--font-mono);font-size:0.8125rem;">2,880</div>
+          </div>
+          <div class="shud-field">
+            <div class="shud-field-label">Triangles</div>
+            <div style="font-family:var(--font-mono);font-size:0.8125rem;">5,120</div>
+          </div>
+          <div class="shud-field">
+            <div class="shud-field-label">Materials</div>
+            <div style="font-family:var(--font-mono);font-size:0.8125rem;">1</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="shud-panel shud-right">
+        <div class="shud-header">Inspector</div>
+        <div class="shud-content">
+          <div class="shud-field">
+            <div class="shud-field-label">Metalness</div>
+            <input type="range" class="shud-slider" id="studio-metalness" min="0" max="1" step="0.01" value="0.1">
+          </div>
+          <div class="shud-field">
+            <div class="shud-field-label">Roughness</div>
+            <input type="range" class="shud-slider" id="studio-roughness" min="0" max="1" step="0.01" value="0.25">
+          </div>
+          <div class="shud-field">
+            <div class="shud-field-label">Environment</div>
+            <select class="shud-select" id="studio-env">
+              <option value="room">Studio Room</option>
+              <option value="city">City Sunset</option>
+              <option value="forest">Forest</option>
+              <option value="none">None</option>
+            </select>
+          </div>
+          <div class="shud-field">
+            <div class="shud-field-label">Background</div>
+            <input type="color" class="shud-color" id="studio-bg" value="#050505">
+          </div>
+          <div class="shud-field shud-toggle-row">
+            <div class="shud-field-label" style="margin:0;">Grid</div>
+            <button class="shud-toggle active" id="studio-grid">On</button>
+          </div>
+          <div class="shud-field shud-toggle-row">
+            <div class="shud-field-label" style="margin:0;">Wireframe</div>
+            <button class="shud-toggle" id="studio-wire">Off</button>
+          </div>
+          <div class="shud-field shud-toggle-row">
+            <div class="shud-field-label" style="margin:0;">Auto Rotate</div>
+            <button class="shud-toggle" id="studio-rotate">Off</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="shud-panel shud-bottom">
+        <div class="shud-viewport-controls">
+          <button class="sv-btn" id="sv-reset" title="Reset">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/>
+            </svg>
+          </button>
+          <button class="sv-btn active" id="sv-orbit" title="Orbit">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="12" cy="12" r="3"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/>
+            </svg>
+          </button>
+          <button class="sv-btn" id="sv-pan" title="Pan">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M5 9l-3 3 3 3M9 5l3-3 3 3M19 9l3 3-3 3M9 19l3 3 3-3"/>
+            </svg>
+          </button>
+          <div style="width:1px;height:20px;background:var(--glass-border);margin:0 4px;"></div>
+          <div style="font-family:var(--font-mono);font-size:0.6875rem;color:var(--text-tertiary);padding:0 8px;" id="sv-zoom">100%</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast Stack -->
+  <div class="toast-stack" id="toast-stack"></div>
+
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+      "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+    }
+  }
+  </script>
+
+  <script type="module">
+    import * as THREE from 'three';
+    import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+    import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+    import { OBJLoader } from 'three/addons/loaders/OBJLoader.js';
+    import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
+
+    // =========================================================
+    // TOAST SYSTEM
+    // =========================================================
+    class ToastSystem {
+      constructor() {
+        this.stack = document.getElementById('toast-stack');
+      }
+      show(msg, type = 'info') {
+        const toast = document.createElement('div');
+        toast.className = `toast toast-${type}`;
+        const icon = type === 'success' ? '✓' : type === 'error' ? '✕' : 'ℹ';
+        toast.innerHTML = `<span class="toast-icon">${icon}</span><span class="toast-msg">${msg}</span>`;
+        this.stack.appendChild(toast);
+        requestAnimationFrame(() => toast.classList.add('show'));
+        setTimeout(() => {
+          toast.classList.remove('show');
+          setTimeout(() => toast.remove(), 500);
+        }, 3500);
+      }
+    }
+
+    const toast = new ToastSystem();
+
+    // =========================================================
+    // ENGINE FACTORY
+    // =========================================================
+    function createEngine(containerId, options = {}) {
+      const container = document.getElementById(containerId);
+      if (!container) return null;
+
+      const scene = new THREE.Scene();
+      scene.background = new THREE.Color(options.bg || 0x050505);
+      if (options.fog !== false) {
+        scene.fog = new THREE.FogExp2(options.bg || 0x050505, 0.02);
+      }
+
+      const width = container.clientWidth;
+      const height = container.clientHeight;
+      const camera = new THREE.PerspectiveCamera(45, width / height, 0.1, 1000);
+      camera.position.set(options.camPos?.[0] || 4, options.camPos?.[1] || 3, options.camPos?.[2] || 5);
+
+      const renderer = new THREE.WebGLRenderer({
+        antialias: true,
+        alpha: true,
+        preserveDrawingBuffer: true,
+        powerPreference: 'high-performance'
+      });
+      renderer.setSize(width, height);
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+      renderer.toneMapping = THREE.ACESFilmicToneMapping;
+      renderer.toneMappingExposure = 1.0;
+      renderer.shadowMap.enabled = true;
+      renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+      renderer.outputColorSpace = THREE.SRGBColorSpace;
+      container.appendChild(renderer.domElement);
+
+      const controls = new OrbitControls(camera, renderer.domElement);
+      controls.enableDamping = true;
+      controls.dampingFactor = 0.05;
+      controls.minDistance = 0.5;
+      controls.maxDistance = 50;
+      controls.maxPolarAngle = Math.PI / 2 - 0.05;
+      controls.target.set(0, 1, 0);
+      controls.enablePan = true;
+
+      // Lights
+      const ambient = new THREE.AmbientLight(0xffffff, 0.3);
+      scene.add(ambient);
+
+      const hemi = new THREE.HemisphereLight(0xffffff, 0x111111, 0.5);
+      scene.add(hemi);
+
+      const key = new THREE.DirectionalLight(0xffffff, 1.5);
+      key.position.set(5, 10, 7);
+      key.castShadow = true;
+      key.shadow.mapSize.set(2048, 2048);
+      key.shadow.bias = -0.0005;
+      scene.add(key);
+
+      const fill = new THREE.DirectionalLight(0x6366f1, 0.4);
+      fill.position.set(-5, 3, -5);
+      scene.add(fill);
+
+      const rim = new THREE.SpotLight(0xffffff, 2);
+      rim.position.set(0, 6, -6);
+      rim.lookAt(0, 0, 0);
+      rim.penumbra = 0.5;
+      scene.add(rim);
+
+      // Ground
+      const groundGeo = new THREE.PlaneGeometry(100, 100);
+      const groundMat = new THREE.ShadowMaterial({ opacity: 0.2 });
+      const ground = new THREE.Mesh(groundGeo, groundMat);
+      ground.rotation.x = -Math.PI / 2;
+      ground.receiveShadow = true;
+      scene.add(ground);
+
+      // Grid
+      const grid = new THREE.GridHelper(50, 50, 0x2a2a2a, 0x1a1a1a);
+      grid.position.y = 0.001;
+      scene.add(grid);
+
+      // Environments
+      const pmrem = new THREE.PMREMGenerator(renderer);
+      const room = new RoomEnvironment();
+      const envRoom = pmrem.fromScene(room).texture;
+      room.dispose();
+
+      const envCity = createEnv(pmrem, [
+        { c: 0xff9944, i: 80, p: [8, 8, 8] },
+        { c: 0x4466ff, i: 40, p: [-8, 4, -8] }
+      ]);
+
+      const envForest = createEnv(pmrem, [
+        { c: 0x88cc88, i: 50, p: [5, 10, 5] },
+        { c: 0x448844, i: 30, p: [-5, 8, -5] }
+      ]);
+
+      scene.environment = envRoom;
+      pmrem.dispose();
+
+      let currentModel = null;
+      let autoRotate = false;
+      let wireframe = false;
+      let frameCount = 0;
+      let lastFps = 0;
+      const clock = new THREE.Clock();
+
+      function createEnv(pm, lights) {
+        const env = new THREE.Scene();
+        lights.forEach(l => {
+          const light = new THREE.PointLight(l.c, l.i, 60);
+          light.position.set(...l.p);
+          env.add(light);
         });
-        return;
-}
+        const s = new THREE.Mesh(new THREE.SphereGeometry(3, 32, 32), new THREE.MeshBasicMaterial({ color: 0x555555 }));
+        s.position.set(0, 6, 0);
+        env.add(s);
+        return pm.fromScene(env).texture;
+      }
 
-const material = new THREE.MeshStandardMaterial({ color: 0x00ff00 });
-currentModel = new THREE.Mesh(geometry, material);
-scene.add(currentModel);
-}
-
-function applyColor(color) {
-if (currentModel) {
-    currentModel.material.color.set(color);
-}
-}
-
-function applyTexture(textureName) {
-if (!currentModel) return;
-if (textureName === "") {
-    currentModel.material.map = null;
-    currentModel.material.needsUpdate = true;
-    return;
-}
-
-// Load texture
-textureLoader.load(textureName, (texture) => {
-    currentModel.material.map = texture;
-    currentModel.material.needsUpdate = true;
-});
-}
-
-function adjustLightIntensity(intensity) {
-directionalLight.intensity = intensity;
-}
-
-function handleFileUpload(file) {
-if (file) {
-    const fileUrl = URL.createObjectURL(file);
-    loader.load(fileUrl, (gltf) => {
+      function loadShape(type) {
         if (currentModel) {
-            scene.remove(currentModel);
+          scene.remove(currentModel);
+          dispose(currentModel);
         }
-        currentModel = gltf.scene;
+
+        let geo;
+        switch(type) {
+          case 'cube': geo = new THREE.BoxGeometry(1.5, 1.5, 1.5); break;
+          case 'sphere': geo = new THREE.SphereGeometry(1.2, 64, 64); break;
+          case 'torus': geo = new THREE.TorusKnotGeometry(1, 0.35, 128, 32); break;
+          case 'icosahedron': geo = new THREE.IcosahedronGeometry(1.3, 0); break;
+          case 'cone': geo = new THREE.ConeGeometry(1.2, 2.2, 32); break;
+          case 'cylinder': geo = new THREE.CylinderGeometry(1, 1, 2.2, 32); break;
+          default: geo = new THREE.TorusKnotGeometry(1, 0.35, 128, 32);
+        }
+
+        const mat = new THREE.MeshStandardMaterial({
+          color: 0x6366f1,
+          metalness: 0.1,
+          roughness: 0.25,
+          envMapIntensity: 1.0
+        });
+
+        currentModel = new THREE.Mesh(geo, mat);
+        currentModel.castShadow = true;
+        currentModel.receiveShadow = true;
+        currentModel.position.y = 1.5;
         scene.add(currentModel);
+
+        currentModel.scale.setScalar(0);
+        const start = performance.now();
+        const tick = (now) => {
+          const p = Math.min((now - start) / 700, 1);
+          const e = 1 - Math.pow(1 - p, 4);
+          currentModel.scale.setScalar(e);
+          if (p < 1) requestAnimationFrame(tick);
+        };
+        requestAnimationFrame(tick);
+
+        return mat;
+      }
+
+      async function loadExternalModel(url) {
+        try {
+          const loader = new GLTFLoader();
+          const gltf = await new Promise((res, rej) => loader.load(url, res, undefined, rej));
+          if (currentModel) {
+            scene.remove(currentModel);
+            dispose(currentModel);
+          }
+          const obj = gltf.scene;
+          const box = new THREE.Box3().setFromObject(obj);
+          const center = box.getCenter(new THREE.Vector3());
+          const size = box.getSize(new THREE.Vector3());
+          obj.position.sub(center);
+          obj.position.y += size.y / 2;
+          const maxDim = Math.max(size.x, size.y, size.z);
+          const targetScale = 3 / maxDim;
+          obj.scale.setScalar(0);
+
+          obj.traverse(c => {
+            if (c.isMesh) {
+              c.castShadow = true;
+              c.receiveShadow = true;
+              if (c.material) {
+                (Array.isArray(c.material) ? c.material : [c.material]).forEach(m => m.envMapIntensity = 1.0);
+              }
+            }
+          });
+
+          currentModel = obj;
+          scene.add(obj);
+
+          const start = performance.now();
+          const tick = (now) => {
+            const p = Math.min((now - start) / 900, 1);
+            const e = 1 - Math.pow(1 - p, 4);
+            obj.scale.setScalar(targetScale * e);
+            if (p < 1) requestAnimationFrame(tick);
+          };
+          requestAnimationFrame(tick);
+
+          controls.target.set(0, (size.y / 2) * targetScale, 0);
+          return true;
+        } catch (err) {
+          return false;
+        }
+      }
+
+      function dispose(obj) {
+        obj.traverse(c => {
+          if (c.geometry) c.geometry.dispose();
+          if (c.material) {
+            (Array.isArray(c.material) ? c.material : [c.material]).forEach(m => m.dispose());
+          }
+        });
+      }
+
+      function setMatProp(prop, val) {
+        if (!currentModel) return;
+        const v = parseFloat(val);
+        currentModel.traverse(c => {
+          if (c.isMesh && c.material) {
+            (Array.isArray(c.material) ? c.material : [c.material]).forEach(m => {
+              if (m[prop] !== undefined) m[prop] = v;
+            });
+          }
+        });
+      }
+
+      function setColor(hex) {
+        if (!currentModel) return;
+        const c = new THREE.Color(hex);
+        currentModel.traverse(child => {
+          if (child.isMesh && child.material) {
+            (Array.isArray(child.material) ? child.material : [child.material]).forEach(m => {
+              if (m.color) m.color.set(c);
+            });
+          }
+        });
+      }
+
+      function setEnv(type) {
+        if (type === 'none') scene.environment = null;
+        else if (type === 'room') scene.environment = envRoom;
+        else if (type === 'city') scene.environment = envCity;
+        else if (type === 'forest') scene.environment = envForest;
+      }
+
+      function setBg(hex) {
+        const c = new THREE.Color(hex);
+        scene.background = c;
+        if (scene.fog) scene.fog.color = c;
+      }
+
+      function animate() {
+        requestAnimationFrame(animate);
+        const delta = clock.getDelta();
+        if (autoRotate && currentModel) {
+          currentModel.rotation.y += delta * 0.5;
+        }
+        controls.update();
+        renderer.render(scene, camera);
+
+        frameCount++;
+        const now = performance.now();
+        if (now - lastFps >= 1000) {
+          if (options.onFps) options.onFps(frameCount);
+          frameCount = 0;
+          lastFps = now;
+        }
+      }
+
+      function onResize() {
+        const w = container.clientWidth;
+        const h = container.clientHeight;
+        camera.aspect = w / h;
+        camera.updateProjectionMatrix();
+        renderer.setSize(w, h);
+      }
+
+      window.addEventListener('resize', onResize);
+
+      return {
+        scene, camera, renderer, controls, grid, loadShape, loadExternalModel,
+        setMatProp, setColor, setEnv, setBg, animate, onResize,
+        get autoRotate() { return autoRotate; },
+        set autoRotate(v) { autoRotate = v; },
+        get wireframe() { return wireframe; },
+        set wireframe(v) {
+          wireframe = v;
+          if (!currentModel) return;
+          currentModel.traverse(c => {
+            if (c.isMesh && c.material) {
+              (Array.isArray(c.material) ? c.material : [c.material]).forEach(m => m.wireframe = v);
+            }
+          });
+        },
+        get currentModel() { return currentModel; }
+      };
+    }
+
+    // =========================================================
+    // HERO ENGINE
+    // =========================================================
+    const hero = createEngine('hero-canvas', {
+      camPos: [3.5, 2.5, 4],
+      onFps: () => {}
     });
-}
-}
 
-function loadEnvironment(envName) {
-if (envName === "none") {
-    scene.environment = null;
-    return;
-}
+    if (hero) {
+      hero.animate();
+      hero.loadShape('torus');
 
-// Load environment
-envLoader.load(envName, (texture) => {
-    texture.mapping = THREE.EquirectangularReflectionMapping;
-    scene.environment = texture;
-});
-}
+      document.querySelectorAll('.film-cell').forEach(cell => {
+        cell.addEventListener('click', () => {
+          document.querySelectorAll('.film-cell').forEach(c => c.classList.remove('active'));
+          cell.classList.add('active');
+          hero.loadShape(cell.dataset.shape);
+        });
+      });
 
-function addAnnotation() {
-if (!currentModel) return;
-const annotation = new THREE.Mesh(
-    new THREE.SphereGeometry(0.05, 16, 16),
-    annotationMaterial
-);
-annotation.position.copy(currentModel.position);
-scene.add(annotation);
-annotations.push(annotation);
+      document.getElementById('hero-grid').addEventListener('click', e => {
+        const active = !hero.grid.visible;
+        hero.grid.visible = active;
+        e.currentTarget.classList.toggle('active', active);
+      });
+      document.getElementById('hero-wire').addEventListener('click', e => {
+        hero.wireframe = !hero.wireframe;
+        e.currentTarget.classList.toggle('active', hero.wireframe);
+      });
+      document.getElementById('hero-rotate').addEventListener('click', e => {
+        hero.autoRotate = !hero.autoRotate;
+        e.currentTarget.classList.toggle('active', hero.autoRotate);
+      });
+    }
 
-annotation.userData = {
-    description: "Annotation text here."
-};
+    // =========================================================
+    // LAB ENGINE
+    // =========================================================
+    const lab = createEngine('lab-canvas', {
+      camPos: [3.5, 2.5, 4],
+      onFps: () => {}
+    });
 
-annotation.callback = function() {
-    alert(annotation.userData.description);
-};
-}
+    if (lab) {
+      lab.animate();
+      lab.loadShape('torus');
 
-function handleAnnotationClick(event) {
-const raycaster = new THREE.Raycaster();
-const mouse = new THREE.Vector2();
+      document.querySelectorAll('.wb-shape-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          document.querySelectorAll('.wb-shape-btn').forEach(b => b.classList.remove('active'));
+          btn.classList.add('active');
+          lab.loadShape(btn.dataset.shape);
+        });
+      });
 
-mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
-mouse.y = - (event.clientY / window.innerHeight) * 2 + 1;
+      document.getElementById('lab-metalness').addEventListener('input', e => lab.setMatProp('metalness', e.target.value));
+      document.getElementById('lab-roughness').addEventListener('input', e => lab.setMatProp('roughness', e.target.value));
+      document.getElementById('lab-color').addEventListener('input', e => lab.setColor(e.target.value));
 
-raycaster.setFromCamera(mouse, camera);
+      document.querySelectorAll('.wb-preset').forEach(btn => {
+        btn.addEventListener('click', () => {
+          document.querySelectorAll('.wb-preset').forEach(b => b.classList.remove('active'));
+          btn.classList.add('active');
+          lab.setEnv(btn.dataset.env);
+        });
+      });
 
-const intersects = raycaster.intersectObjects(annotations);
-if (intersects.length > 0) {
-    intersects[0].object.callback();
-}
-}
+      document.getElementById('lab-grid').addEventListener('click', e => {
+        const active = !lab.grid.visible;
+        lab.grid.visible = active;
+        e.currentTarget.classList.toggle('active', active);
+      });
+      document.getElementById('lab-wire').addEventListener('click', e => {
+        lab.wireframe = !lab.wireframe;
+        e.currentTarget.classList.toggle('active', lab.wireframe);
+      });
+      document.getElementById('lab-rotate').addEventListener('click', e => {
+        lab.autoRotate = !lab.autoRotate;
+        e.currentTarget.classList.toggle('active', lab.autoRotate);
+      });
+    }
 
-function moveCamera(direction) {
-switch (direction) {
-    case 'forward':
-        camera.position.z -= 0.1;
-        break;
-    case 'backward':
-        camera.position.z += 0.1;
-        break;
-    case 'left':
-        camera.position.x -= 0.1;
-        break;
-    case 'right':
-        camera.position.x += 0.1;
-        break;
-}
-}
+    // =========================================================
+    // INLINE ENGINE
+    // =========================================================
+    const inline = createEngine('inline-canvas', {
+      camPos: [4, 3, 5],
+      onFps: () => {}
+    });
 
-window.addEventListener('click', handleAnnotationClick, false);
+    const inlineStage = document.getElementById('inline-stage');
+    const inlineTitle = document.getElementById('inline-title');
 
-// Initialize the scene
-init();
-</script>
+    const modelUrls = {
+      robot: 'https://threejs.org/examples/models/gltf/RobotExpressive.glb',
+      duck: 'https://cdn.jsdelivr.net/gh/KhronosGroup/glTF-Sample-Models@master/2.0/Duck/glTF-Binary/Duck.glb',
+      fox: 'https://cdn.jsdelivr.net/gh/KhronosGroup/glTF-Sample-Models@master/2.0/Fox/glTF-Binary/Fox.glb',
+      helmet: 'https://cdn.jsdelivr.net/gh/KhronosGroup/glTF-Sample-Models@master/2.0/FlightHelmet/glTF-Binary/FlightHelmet.glb'
+    };
+
+    if (inline) {
+      inline.animate();
+
+      document.querySelectorAll('.gallery-card').forEach(card => {
+        card.addEventListener('click', async () => {
+          const model = card.dataset.model;
+          const url = modelUrls[model];
+          const name = card.querySelector('.gallery-name').textContent;
+
+          inlineStage.classList.add('active');
+          inlineStage.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          inlineTitle.textContent = name;
+          toast.show(`Loading ${name}...`, 'info');
+
+          const ok = await inline.loadExternalModel(url);
+          if (ok) {
+            toast.show(`${name} loaded`, 'success');
+          } else {
+            toast.show(`Failed to load ${name}`, 'error');
+          }
+        });
+      });
+
+      document.getElementById('inline-close').addEventListener('click', () => {
+        inlineStage.classList.remove('active');
+      });
+    }
+
+    // =========================================================
+    // STUDIO ENGINE
+    // =========================================================
+    const studio = createEngine('studio-canvas', {
+      camPos: [5, 3, 5],
+      onFps: (fps) => {
+        document.getElementById('studio-fps').textContent = fps + ' FPS';
+      }
+    });
+
+    if (studio) {
+      studio.animate();
+      studio.loadShape('torus');
+
+      document.getElementById('open-studio').addEventListener('click', () => {
+        document.getElementById('studio-overlay').classList.add('active');
+        document.body.style.overflow = 'hidden';
+        studio.onResize();
+        toast.show('Studio mode active', 'info');
+      });
+
+      document.getElementById('nav-launch').addEventListener('click', () => {
+        document.getElementById('studio-overlay').classList.add('active');
+        document.body.style.overflow = 'hidden';
+        studio.onResize();
+        toast.show('Studio mode active', 'info');
+      });
+
+      document.getElementById('studio-back').addEventListener('click', () => {
+        document.getElementById('studio-overlay').classList.remove('active');
+        document.body.style.overflow = '';
+      });
+
+      document.getElementById('studio-metalness').addEventListener('input', e => studio.setMatProp('metalness', e.target.value));
+      document.getElementById('studio-roughness').addEventListener('input', e => studio.setMatProp('roughness', e.target.value));
+      document.getElementById('studio-env').addEventListener('change', e => {
+        studio.setEnv(e.target.value);
+        const names = { room: 'Studio Environment', city: 'City Sunset', forest: 'Forest', none: 'No Environment' };
+        document.getElementById('studio-badge').textContent = names[e.target.value];
+      });
+      document.getElementById('studio-bg').addEventListener('input', e => studio.setBg(e.target.value));
+
+      document.getElementById('studio-grid').addEventListener('click', e => {
+        const active = !studio.grid.visible;
+        studio.grid.visible = active;
+        e.target.textContent = active ? 'On' : 'Off';
+        e.target.classList.toggle('active', active);
+      });
+      document.getElementById('studio-wire').addEventListener('click', e => {
+        studio.wireframe = !studio.wireframe;
+        e.target.textContent = studio.wireframe ? 'On' : 'Off';
+        e.target.classList.toggle('active', studio.wireframe);
+      });
+      document.getElementById('studio-rotate').addEventListener('click', e => {
+        studio.autoRotate = !studio.autoRotate;
+        e.target.textContent = studio.autoRotate ? 'On' : 'Off';
+        e.target.classList.toggle('active', studio.autoRotate);
+      });
+
+      document.getElementById('sv-reset').addEventListener('click', () => {
+        studio.controls.reset();
+        toast.show('View reset', 'info');
+      });
+
+      studio.controls.addEventListener('change', () => {
+        const dist = studio.camera.position.distanceTo(studio.controls.target);
+        const pct = Math.round((5 / dist) * 100);
+        document.getElementById('sv-zoom').textContent = Math.min(Math.max(pct, 25), 400) + '%';
+      });
+
+      document.getElementById('studio-screenshot').addEventListener('click', () => {
+        studio.renderer.render(studio.scene, studio.camera);
+        const url = studio.renderer.domElement.toDataURL('image/png');
+        const a = document.createElement('a');
+        a.download = 'aura-studio-capture.png';
+        a.href = url;
+        a.click();
+        toast.show('Screenshot exported', 'success');
+      });
+
+      document.getElementById('studio-fullscreen').addEventListener('click', () => {
+        if (!document.fullscreenElement) document.documentElement.requestFullscreen();
+        else document.exitFullscreen();
+      });
+    }
+
+    // =========================================================
+    // NAV SCROLL SPY
+    // =========================================================
+    const sections = ['hero', 'shapes', 'models', 'studio'];
+    const navLinks = document.querySelectorAll('.nav-link[data-section]');
+    window.addEventListener('scroll', () => {
+      const scroll = window.scrollY + 200;
+      sections.forEach(id => {
+        const el = document.getElementById(id);
+        if (el && scroll >= el.offsetTop && scroll < el.offsetTop + el.offsetHeight) {
+          navLinks.forEach(l => l.classList.toggle('active', l.dataset.section === id));
+        }
+      });
+    });
+
+    navLinks.forEach(link => {
+      link.addEventListener('click', () => {
+        const id = link.dataset.section;
+        document.getElementById(id).scrollIntoView({ behavior: 'smooth' });
+      });
+    });
+
+    const studioOverlay = document.getElementById('studio-overlay');
+    const navBar = document.getElementById('nav-bar');
+    const observer = new MutationObserver(() => {
+      if (studioOverlay.classList.contains('active')) {
+        navBar.classList.add('hidden');
+      } else {
+        navBar.classList.remove('hidden');
+      }
+    });
+    observer.observe(studioOverlay, { attributes: true, attributeFilter: ['class'] });
+
+    // =========================================================
+    // KEYBOARD
+    // =========================================================
+    document.addEventListener('keydown', (e) => {
+      if (e.target.tagName === 'INPUT') return;
+      if (e.key.toLowerCase() === 'r' && studioOverlay.classList.contains('active')) {
+        studio.controls.reset();
+        toast.show('View reset', 'info');
+      }
+      if (e.key.toLowerCase() === 'f' && studioOverlay.classList.contains('active')) {
+        if (!document.fullscreenElement) document.documentElement.requestFullscreen();
+        else document.exitFullscreen();
+      }
+      if (e.key === ' ' && studioOverlay.classList.contains('active')) {
+        e.preventDefault();
+        studio.autoRotate = !studio.autoRotate;
+        const btn = document.getElementById('studio-rotate');
+        btn.textContent = studio.autoRotate ? 'On' : 'Off';
+        btn.classList.toggle('active', studio.autoRotate);
+      }
+    });
+  </script>
 </body>
 </html>
-
